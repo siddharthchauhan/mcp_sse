@@ -4,6 +4,8 @@ import json
 import asyncio
 from typing import Optional, Dict, Any, List
 import os
+import asyncpg
+from neo4j import AsyncGraphDatabase
 
 # Get port from environment or use default 9001
 PORT = int(os.getenv("PORT", 9001))
@@ -138,6 +140,42 @@ async def get_page_content(url: str, max_chars: int = 5000) -> str:
             
     except Exception as e:
         return f"Error fetching {url}: {str(e)}"
+
+
+@mcp.tool()
+async def postgres_query(query: str) -> str:
+    """Execute a SQL query against a PostgreSQL database."""
+    try:
+        pool = await asyncpg.create_pool(
+            host=os.getenv("POSTGRES_HOST", "localhost"),
+            port=int(os.getenv("POSTGRES_PORT", 5432)),
+            user=os.getenv("POSTGRES_USER", "postgres"),
+            password=os.getenv("POSTGRES_PASSWORD", ""),
+            database=os.getenv("POSTGRES_DB", "postgres"),
+        )
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(query)
+        await pool.close()
+        return json.dumps([dict(r) for r in rows], indent=2)
+    except Exception as e:
+        return f"Postgres query error: {str(e)}"
+
+
+@mcp.tool()
+async def neo4j_query(query: str) -> str:
+    """Run a Cypher query against a Neo4j database."""
+    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    user = os.getenv("NEO4J_USER", "neo4j")
+    password = os.getenv("NEO4J_PASSWORD", "neo4j")
+    try:
+        driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
+        async with driver.session() as session:
+            result = await session.run(query)
+            records = [record.data() async for record in result]
+        await driver.close()
+        return json.dumps(records, indent=2)
+    except Exception as e:
+        return f"Neo4j query error: {str(e)}"
 
 if __name__ == "__main__":
     # Run the server

@@ -3,6 +3,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
 import traceback
 import sys
 import os
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
 
 async def main():
     """Simplified client for debugging the SSE connection."""
@@ -29,9 +31,22 @@ async def main():
         async with client.session("websearch") as session:
             print("Successfully connected to server!")
             
-            # Just try to load tools to verify connection is working
+            # Load all available tools from the server
             tools = await load_mcp_tools(session)
             print(f"Success! Available tools: {[tool.name for tool in tools]}")
+
+            # Create a ReAct agent with LangGraph if an OpenAI API key is set
+            openai_key = os.getenv("OPENAI_API_KEY")
+            if openai_key:
+                llm = ChatOpenAI(api_key=openai_key, model="gpt-3.5-turbo")
+                agent = create_react_agent(model=llm, tools=tools)
+                print("Running agent with a sample prompt...")
+                result = await agent.ainvoke({
+                    "messages": [{"role": "user", "content": "Hello"}]
+                })
+                print(f"Agent result: {result}")
+            else:
+                print("OPENAI_API_KEY not set, skipping agent run")
             
     except asyncio.CancelledError:
         print("Operation was cancelled")
