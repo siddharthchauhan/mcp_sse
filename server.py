@@ -2,7 +2,6 @@ from fastmcp import FastMCP
 import httpx
 import json
 import asyncio
-from typing import Optional, Dict, Any, List
 import os
 
 # Get port from environment or use default 9001
