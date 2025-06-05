@@ -4,6 +4,7 @@ import json
 import asyncio
 from typing import Optional, Dict, Any, List
 import os
+import asyncpg
 
 # Get port from environment or use default 9001
 PORT = int(os.getenv("PORT", 9001))
@@ -138,6 +139,24 @@ async def get_page_content(url: str, max_chars: int = 5000) -> str:
             
     except Exception as e:
         return f"Error fetching {url}: {str(e)}"
+
+@mcp.tool()
+async def postgres_query(database_url: str, query: str) -> str:
+    """Execute a SQL query against a PostgreSQL database."""
+    pool = await asyncpg.create_pool(database_url)
+    try:
+        async with pool.acquire() as conn:
+            if query.lstrip().lower().startswith("select"):
+                rows = await conn.fetch(query)
+                result = [dict(row) for row in rows]
+                return json.dumps(result)
+            else:
+                await conn.execute(query)
+                return "Query executed successfully"
+    except Exception as e:
+        return f"Error executing query: {e}"
+    finally:
+        await pool.close()
 
 if __name__ == "__main__":
     # Run the server
